@@ -1,0 +1,162 @@
+---
+title: "Discussion 3 Nov"
+format: html
+editor: visual
+---
+
+## TidyTuesday Dataset
+
+<https://github.com/rfordatascience/tidytuesday/blob/main/data/2025/2025-10-28/readme.md>
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+## install.packages("tidytuesdayR")
+
+tuesdata <- tidytuesdayR::tt_load('2025-10-28')
+#tuesdata <- tidytuesdayR::tt_load(2025, week = 43)
+
+prizes <- tuesdata$prizes
+
+```
+
+```{r}
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(readr)
+
+
+prizes <- read_csv("prizes.csv", show_col_types = FALSE)
+
+
+ui <- navbarPage(
+  "British Literary Prizes Explorer",
+
+
+  tabPanel("Data Explorer",
+    sidebarLayout(
+      sidebarPanel(
+        sliderInput("year", "Year Range", 
+                    min = min(prizes$prize_year, na.rm = TRUE),
+                    max = max(prizes$prize_year, na.rm = TRUE),
+                    value = range(prizes$prize_year, na.rm = TRUE),
+                    sep = ""),
+        selectInput("genre", "Genre", 
+                    choices = c("All", sort(unique(prizes$prize_genre)))))
+    ,
+      mainPanel(
+        h3("Filtered Data"),
+        DTOutput("table")
+      )
+    )
+  ),
+
+
+  tabPanel("Diversity Over Time",
+    sidebarLayout(
+      sidebarPanel(
+        radioButtons("group", "Group By:",
+                     choices = c("Gender" = "gender",
+                                 "Ethnicity" = "ethnicity_macro"),
+                     selected = "gender")
+      ),
+      mainPanel(
+        h3("Representation Over Time"),
+        plotOutput("trend_plot")
+      )
+    )
+  ),
+
+
+  tabPanel("Genre Comparison",
+    sidebarLayout(
+      sidebarPanel(
+        radioButtons("group2", "Compare By:",
+                     choices = c("Gender" = "gender",
+                                 "Ethnicity" = "ethnicity_macro"))
+      ),
+      mainPanel(
+        h3("Group Proportion in Each Genre"),
+        plotOutput("genre_plot")
+      )
+    )
+  )
+)
+
+
+server <- function(input, output, session) {
+  
+
+  filtered_data <- reactive({
+    df <- prizes %>%
+      filter(prize_year >= input$year[1],
+             prize_year <= input$year[2])
+    
+    if (input$genre != "All") {
+      df <- df %>% filter(prize_genre == input$genre)
+    }
+    df
+  })
+  
+  output$table <- renderDT({
+    datatable(filtered_data(), options = list(pageLength = 10))
+  })
+  
+
+  output$trend_plot <- renderPlot({
+    group_var <- rlang::sym(input$group)
+    
+    prizes %>%
+      filter(!is.na(!!group_var)) %>%
+      count(prize_year, !!group_var) %>%
+      ggplot(aes(x = prize_year, y = n, color = !!group_var)) +
+      geom_line(linewidth = 1) +
+      geom_point() +
+      labs(x = "Year", y = "Count",
+           color = tools::toTitleCase(input$group),
+           title = "Representation Over Time") +
+      theme_minimal()
+  })
+  
+
+  output$genre_plot <- renderPlot({
+    group_var <- rlang::sym(input$group2)
+    
+    prizes %>%
+      filter(!is.na(prize_genre), !is.na(!!group_var)) %>%
+      count(prize_genre, !!group_var) %>%
+      group_by(prize_genre) %>%
+      mutate(prop = n / sum(n)) %>%
+      ggplot(aes(x = prize_genre, y = prop, fill = !!group_var)) +
+      geom_col(position = "stack") +
+      coord_flip() +
+      labs(x = "Genre", y = "Proportion", 
+           fill = tools::toTitleCase(input$group2),
+           title = "Group Proportion by Genre") +
+      theme_minimal()
+  })
+}
+
+
+shinyApp(ui, server)
+
+```
+
+## Deliverable
+
+-   Create a **Shiny app** with an interactive interface that allows users to easily explore the dataset using relevant filters.
+
+-   Your app should include multiple **web pages (tabs)** that address key questions about the dataset. These questions can be based on those discussed in class or ones you develop on your own --- bonus points will be awarded for original questions that demonstrate insight or creativity.
+
+-   The app should include **data visualizations** that help communicate your findings clearly.
+
+-   When submitting, please provide a **GitHub repository** containing:
+
+    -   `app.R` (the main file to run the app)
+
+    -   Any additional scripts used in the app
+
+    -   The cleaned dataset
+
+    -   A working version of the app that can be launched directly from `app.R`
