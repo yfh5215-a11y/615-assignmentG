@@ -27,7 +27,7 @@ library(DT)
 library(readr)
 
 
-prizes <- read_csv("prizes.csv", show_col_types = FALSE)
+
 
 
 ui <- navbarPage(
